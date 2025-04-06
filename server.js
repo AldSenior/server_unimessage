@@ -2,13 +2,27 @@ const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
 const cookieParser = require("cookie-parser");
-
+const helmet = require("helmet");
 const app = express();
 
 // Настройки для VK
 const CLIENT_ID = "53263292"; // Ваш Client ID
 const CLIENT_SECRET = "xK4loxyZGbRjhC7OjBw2"; // Ваш Client Secret
 const REDIRECT_URI = "https://server-unimessage.onrender.com/api/vk/callback"; // Redirect URI
+
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      frameAncestors: [
+        "'self'",
+        "https://vk.com",
+        "https://*.vk.com",
+        "https://*.my.games",
+      ],
+    },
+  }),
+);
 
 // Настройки CORS
 app.use(
