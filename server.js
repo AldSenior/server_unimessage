@@ -82,7 +82,7 @@ app.post("/api/vk/exchange-code", async (req, res) => {
   }
 });
 
-pp.get("/api/messages", async (req, res) => {
+app.get("/api/messages", async (req, res) => {
   const accessToken = req.cookies.access_token; // Получаем токен из куков
 
   if (!accessToken) {
