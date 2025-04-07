@@ -13,39 +13,66 @@ app.use(
     allowedHeaders: ["Content-Type"], // Добавлено
   }),
 );
+const VK_CONFIG = {
+  clientId: "53263292",
+  clientSecret: "xK4loxyZGbRjhC7OjBw2",
+  redirectUri: "https://www.unimessage.ru/messages",
+};
 
-// Эндпоинт для обмена кода на токен
 app.post("/api/exchange-code", async (req, res) => {
-  const { code } = req.body; // device_id не нужен для VK API
+  const { code } = req.body;
 
-  if (!code) {
-    return res.status(400).json({ error: "Code is required" });
+  if (!code || typeof code !== "string") {
+    return res.status(400).json({
+      error: "invalid_request",
+      error_description: "Authorization code is required and must be a string",
+    });
   }
 
   try {
-    const response = await axios.get("https://oauth.vk.com/access_token", {
-      params: {
-        client_id: 53263292,
-        client_secret: "xK4loxyZGbRjhC7OjBw2",
-        redirect_uri: "https://www.unimessage.ru/messages",
-        code: code,
-        // device_id не используется в VK OAuth
-      },
-    });
+    const params = new URLSearchParams();
+    params.append("client_id", VK_CONFIG.clientId);
+    params.append("client_secret", VK_CONFIG.clientSecret);
+    params.append("redirect_uri", VK_CONFIG.redirectUri);
+    params.append("code", code);
 
-    return res.json(response.data);
-  } catch (error) {
-    console.error(
-      "Error exchanging code:",
-      error.response?.data || error.message,
+    console.log("Sending request to VK with params:", params.toString());
+
+    const response = await axios.post(
+      "https://oauth.vk.com/access_token",
+      params,
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      },
     );
-    return res.status(500).json({
-      error: "Failed to exchange code",
-      details: error.response?.data || error.message,
+
+    console.log("VK response:", response.data);
+
+    if (response.data.error) {
+      return res.status(400).json({
+        error: response.data.error,
+        error_description: response.data.error_description,
+      });
+    }
+
+    return res.json({
+      access_token: response.data.access_token,
+      expires_in: response.data.expires_in,
+      user_id: response.data.user_id,
     });
+  } catch (error) {
+    console.error("Full error:", error);
+
+    const errorData = error.response?.data || {
+      error: "server_error",
+      error_description: error.message,
+    };
+
+    return res.status(500).json(errorData);
   }
 });
-
 // Эндпоинт для получения сообщений
 app.post("/api/messages", async (req, res) => {
   try {
