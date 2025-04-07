@@ -75,44 +75,54 @@ app.post("/api/messages", async (req, res) => {
       });
     }
 
-    // Используем easyvk для работы с VK API
-    const vk = await easyvk({
-      access_token,
-      v: "5.131",
-    });
+    // Прямой запрос к API VK без easyvk
+    const response = await axios.get(
+      "https://api.vk.com/method/messages.getConversations",
+      {
+        params: {
+          access_token: access_token,
+          v: "5.131",
+          count: 20,
+          extended: 1,
+        },
+        headers: {
+          "X-Client-IP": process.env.SERVER_IP, // Если используете прокси
+        },
+      },
+    );
 
-    // Получаем сообщения
-    const conversations = await vk.call("messages.getConversations", {
-      count: 20,
-      extended: 1,
-    });
+    const conversations = response.data.response;
 
-    // Получаем информацию о пользователях
+    // Дополнительные запросы к users.get
     const userIds = conversations.items
       .map((item) => item.conversation.peer.id)
       .filter((id) => id > 0);
 
-    const usersInfo =
-      userIds.length > 0
-        ? await vk.call("users.get", {
-            user_ids: userIds.join(","),
-            fields: "photo_100,first_name,last_name",
-          })
-        : [];
+    const usersResponse = await axios.get(
+      "https://api.vk.com/method/users.get",
+      {
+        params: {
+          user_ids: userIds.join(","),
+          fields: "photo_100,first_name,last_name",
+          access_token: access_token,
+          v: "5.131",
+        },
+      },
+    );
 
     res.json({
       success: true,
       data: {
         conversations: conversations.items,
-        profiles: usersInfo,
+        profiles: usersResponse.data.response,
         count: conversations.count,
       },
     });
   } catch (error) {
-    console.error("Error fetching messages:", error);
+    console.error("VK API Error:", error.response?.data || error.message);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.response?.data?.error_msg || error.message,
     });
   }
 });
