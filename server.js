@@ -82,6 +82,43 @@ app.post("/api/vk/exchange-code", async (req, res) => {
   }
 });
 
+pp.get("/api/messages", async (req, res) => {
+  const accessToken = req.cookies.access_token; // Получаем токен из куков
+
+  if (!accessToken) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+
+  try {
+    // Запрос к API VK для получения сообщений
+    const response = await axios.get(
+      "https://api.vk.com/method/messages.getConversations",
+      {
+        params: {
+          access_token: accessToken,
+          v: "5.131", // Версия API
+          count: 20, // Количество сообщений на страницу
+        },
+      },
+    );
+
+    const messagesData = response.data;
+
+    // Если есть ошибки в ответе VK
+    if (messagesData.error) {
+      return res
+        .status(400)
+        .json({ success: false, error: messagesData.error });
+    }
+
+    // Возвращаем данные о сообщениях
+    return res.json(messagesData.response);
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    return res.status(500).json({ success: false, error: "Server error" });
+  }
+});
+
 app.get("/api/vk/callback", (req, res) => {
   const { code, error } = req.query;
 
