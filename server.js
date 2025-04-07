@@ -1,18 +1,17 @@
 const express = require("express");
 const cors = require("cors");
-const easyvk = require("easyvk");
-const app = express();
 const axios = require("axios");
+const app = express();
 
 app.use(express.json());
 app.use(
   cors({
     origin: "https://www.unimessage.ru",
-    credentials: true,
-    methods: ["GET", "POST", "OPTIONS"], // Добавлено
-    allowedHeaders: ["Content-Type"], // Добавлено
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
   }),
 );
+
 const VK_CONFIG = {
   clientId: "53263292",
   clientSecret: "xK4loxyZGbRjhC7OjBw2",
@@ -20,59 +19,49 @@ const VK_CONFIG = {
 };
 
 app.post("/api/exchange-code", async (req, res) => {
-  const { code } = req.body;
+  const { code, code_verifier, device_id } = req.body;
 
-  if (!code || typeof code !== "string") {
+  if (!code || !code_verifier) {
     return res.status(400).json({
       error: "invalid_request",
-      error_description: "Authorization code is required and must be a string",
+      error_description: "Missing required parameters",
     });
   }
 
   try {
     const params = new URLSearchParams();
+    params.append("grant_type", "authorization_code");
     params.append("client_id", VK_CONFIG.clientId);
     params.append("client_secret", VK_CONFIG.clientSecret);
-    params.append("redirect_uri", VK_CONFIG.redirectUri);
     params.append("code", code);
+    params.append("code_verifier", code_verifier);
+    params.append("redirect_uri", VK_CONFIG.redirectUri);
+    if (device_id) params.append("device_id", device_id);
 
-    console.log("Sending request to VK with params:", params.toString());
-
-    const response = await axios.post(
-      "https://oauth.vk.com/access_token",
-      params,
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      },
-    );
-
-    console.log("VK response:", response.data);
+    const response = await axios.post("https://id.vk.com/oauth2/auth", params, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
 
     if (response.data.error) {
-      return res.status(400).json({
-        error: response.data.error,
-        error_description: response.data.error_description,
-      });
+      return res.status(400).json(response.data);
     }
 
-    return res.json({
+    res.json({
       access_token: response.data.access_token,
+      refresh_token: response.data.refresh_token,
       expires_in: response.data.expires_in,
       user_id: response.data.user_id,
     });
   } catch (error) {
-    console.error("Full error:", error);
-
-    const errorData = error.response?.data || {
+    console.error("VK API Error:", error.response?.data || error.message);
+    res.status(500).json({
       error: "server_error",
-      error_description: error.message,
-    };
-
-    return res.status(500).json(errorData);
+      error_description:
+        error.response?.data?.error_description || error.message,
+    });
   }
 });
+
 // Эндпоинт для получения сообщений
 app.post("/api/messages", async (req, res) => {
   try {
