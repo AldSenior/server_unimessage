@@ -75,8 +75,8 @@ app.post("/api/messages", async (req, res) => {
       });
     }
 
-    // Прямой запрос к API VK без easyvk
-    const response = await axios.get(
+    // Получаем список бесед
+    const convResponse = await axios.get(
       "https://api.vk.com/method/messages.getConversations",
       {
         params: {
@@ -85,41 +85,54 @@ app.post("/api/messages", async (req, res) => {
           count: 20,
           extended: 1,
         },
-        headers: {
-          "X-Client-IP": process.env.SERVER_IP, // Если используете прокси
-        },
       },
     );
 
-    const conversations = response.data.response;
+    // Добавляем проверку структуры ответа
+    if (!convResponse.data.response) {
+      console.error("Invalid VK API response:", convResponse.data);
+      return res.status(500).json({
+        success: false,
+        error: "Invalid response structure from VK API",
+        vk_response: convResponse.data,
+      });
+    }
 
-    // Дополнительные запросы к users.get
+    const conversations = convResponse.data.response;
+
+    // Извлекаем ID пользователей
     const userIds = conversations.items
       .map((item) => item.conversation.peer.id)
       .filter((id) => id > 0);
 
-    const usersResponse = await axios.get(
-      "https://api.vk.com/method/users.get",
-      {
-        params: {
-          user_ids: userIds.join(","),
-          fields: "photo_100,first_name,last_name",
-          access_token: access_token,
-          v: "5.131",
+    // Получаем информацию о пользователях
+    let usersInfo = [];
+    if (userIds.length > 0) {
+      const usersResponse = await axios.get(
+        "https://api.vk.com/method/users.get",
+        {
+          params: {
+            user_ids: userIds.join(","),
+            fields: "photo_100,first_name,last_name",
+            access_token: access_token,
+            v: "5.131",
+          },
         },
-      },
-    );
+      );
+
+      usersInfo = usersResponse.data.response || [];
+    }
 
     res.json({
       success: true,
       data: {
         conversations: conversations.items,
-        profiles: usersResponse.data.response,
+        profiles: usersInfo,
         count: conversations.count,
       },
     });
   } catch (error) {
-    console.error("VK API Error:", error.response?.data || error.message);
+    console.error("Error fetching messages:", error.response?.data || error);
     res.status(500).json({
       success: false,
       error: error.response?.data?.error_msg || error.message,
