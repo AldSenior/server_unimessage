@@ -82,6 +82,19 @@ app.post("/api/vk/exchange-code", async (req, res) => {
   }
 });
 
+app.get("/api/vk/callback", (req, res) => {
+  const { code, error } = req.query;
+
+  if (error) {
+    return res
+      .status(400)
+      .json({ success: false, error: "Authorization error" });
+  }
+
+  // Здесь код можно обработать, к примеру, можете просто вернуть сообщение
+  res.send("Authorization successful! You can close this tab.");
+});
+
 // Запуск сервера
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
