@@ -3,34 +3,47 @@ const cors = require("cors");
 const easyvk = require("easyvk");
 const app = express();
 
+app.use(express.json());
 app.use(
   cors({
     origin: "https://www.unimessage.ru",
     credentials: true,
+    methods: ["GET", "POST", "OPTIONS"], // Добавлено
+    allowedHeaders: ["Content-Type"], // Добавлено
   }),
 );
-app.post("/api/exchange-code", async (req, res) => {
-  const { code, device_id } = req.body;
 
-  // Обмен кода на токен доступа
+// Эндпоинт для обмена кода на токен
+app.post("/api/exchange-code", async (req, res) => {
+  const { code } = req.body; // device_id не нужен для VK API
+
+  if (!code) {
+    return res.status(400).json({ error: "Code is required" });
+  }
+
   try {
     const response = await axios.get("https://oauth.vk.com/access_token", {
       params: {
-        client_id: "53263292", // Замените на ваш client_id
-        client_secret: "xK4loxyZGbRjhC7OjBw2", // Замените на ваш client_secret
-        redirect_uri: "https://www.unimessage.ru/messages", // URL перенаправления
+        client_id: 53263292,
+        client_secret: "xK4loxyZGbRjhC7OjBw2",
+        redirect_uri: "https://www.unimessage.ru/messages",
         code: code,
-        device_id: device_id,
+        // device_id не используется в VK OAuth
       },
     });
 
-    return res.json(response.data); // Отправляем данные о токене обратно клиенту
+    return res.json(response.data);
   } catch (error) {
-    console.error("Error exchanging code for token:", error);
-    return res.status(500).json({ error: "Failed to exchange code for token" });
+    console.error(
+      "Error exchanging code:",
+      error.response?.data || error.message,
+    );
+    return res.status(500).json({
+      error: "Failed to exchange code",
+      details: error.response?.data || error.message,
+    });
   }
 });
-app.use(express.json());
 
 // Эндпоинт для получения сообщений
 app.post("/api/messages", async (req, res) => {
