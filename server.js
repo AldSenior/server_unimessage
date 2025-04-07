@@ -9,7 +9,27 @@ app.use(
     credentials: true,
   }),
 );
+app.post("/api/exchange-code", async (req, res) => {
+  const { code, device_id } = req.body;
 
+  // Обмен кода на токен доступа
+  try {
+    const response = await axios.get("https://oauth.vk.com/access_token", {
+      params: {
+        client_id: "53263292", // Замените на ваш client_id
+        client_secret: "xK4loxyZGbRjhC7OjBw2", // Замените на ваш client_secret
+        redirect_uri: "https://www.unimessage.ru/messages", // URL перенаправления
+        code: code,
+        device_id: device_id,
+      },
+    });
+
+    return res.json(response.data); // Отправляем данные о токене обратно клиенту
+  } catch (error) {
+    console.error("Error exchanging code for token:", error);
+    return res.status(500).json({ error: "Failed to exchange code for token" });
+  }
+});
 app.use(express.json());
 
 // Эндпоинт для получения сообщений
