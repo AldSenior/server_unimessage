@@ -1,19 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-const axios = require("axios");
-const cookieParser = require("cookie-parser");
-const helmet = require("helmet");
-const app = express();
 const easyvk = require("easyvk");
-
-app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      frameAncestors: ["'self'", "https://vk.com", "https://*.vk.com"],
-    },
-  }),
-);
+const app = express();
 
 app.use(
   cors({
@@ -23,74 +11,32 @@ app.use(
 );
 
 app.use(express.json());
-app.use(cookieParser());
 
-app.post("/api/vk/exchange-code", async (req, res) => {
-  const { code } = req.body;
-
-  if (!code) {
-    return res.status(400).json({
-      success: false,
-      error: "Authorization code not provided",
-    });
-  }
-
+// Эндпоинт для получения сообщений
+app.post("/api/messages", async (req, res) => {
   try {
-    const tokenResponse = await axios.get("https://oauth.vk.com/access_token", {
-      params: {
-        client_id: "53263292",
-        client_secret: "xK4loxyZGbRjhC7OjBw2",
-        redirect_uri: "https://www.unimessage.ru/messages",
-        code,
-      },
-    });
+    const { access_token } = req.body;
 
-    const data = tokenResponse.data;
-
-    res.cookie("vk_access_token", data.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
-      maxAge: data.expires_in * 1000,
-    });
-
-    res.json({
-      success: true,
-      data: {
-        user_id: data.user_id,
-        expires_in: data.expires_in,
-      },
-    });
-  } catch (error) {
-    console.error("Error while exchanging code:", error);
-    res.status(500).json({
-      success: false,
-      error: error.response?.data?.error_description || "Server error",
-    });
-  }
-});
-
-app.get("/api/messages", async (req, res) => {
-  try {
-    const accessToken = req.cookies.vk_access_token;
-
-    if (!accessToken) {
+    if (!access_token) {
       return res.status(401).json({
         success: false,
-        error: "Unauthorized",
+        error: "Access token is required",
       });
     }
 
+    // Используем easyvk для работы с VK API
     const vk = await easyvk({
-      access_token: accessToken,
+      access_token,
       v: "5.131",
     });
 
+    // Получаем сообщения
     const conversations = await vk.call("messages.getConversations", {
       count: 20,
       extended: 1,
     });
 
+    // Получаем информацию о пользователях
     const userIds = conversations.items
       .map((item) => item.conversation.peer.id)
       .filter((id) => id > 0);
